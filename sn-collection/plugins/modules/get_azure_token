@@ -1,1 +1,127 @@
 
+#!/usr/bin/python
+
+# Import required Ansible module utilities and external libraries
+from ansible.module_utils.basic import AnsibleModule
+import requests
+
+DOCUMENTATION = r'''
+---
+module: get_azure_token
+short_description: Authenticate with Microsoft Azure AD and retrieve bearer token
+description:
+- This module authenticates with Azure AD using OAuth2 client credentials flow.
+- It returns an access token for use in ServiceNow API calls via Azure API Gateway.
+version_added: "1.1.0"
+options:
+client_id:
+    description:
+    - Azure AD application (client) ID.
+    required: true
+    type: str
+client_secret:
+    description:
+    - Azure AD application client secret.
+    required: true
+    type: str
+tenant_id:
+    description:
+    - Azure AD tenant ID.
+    required: true
+    type: str
+scope:
+    description:
+    - OAuth2 scope (usually API resource + ".default").
+    required: true
+    type: str
+grant_type:
+    description:
+    - OAuth2 grant type.
+    type: str
+    default: client_credentials
+author:
+- Your Name (@yourhandle)
+'''
+
+EXAMPLES = r'''
+- name: Get Azure AD access token
+  riotinto.servicenow.get_azure_token:
+      tenant_id: "your-tenant-id"
+      client_id: "your-client-id"
+      client_secret: "your-client-secret"
+      scope: "https://management.azure.com/.default"
+  register: auth_token
+'''
+
+RETURN = r'''
+access_token:
+  description: The OAuth2 access token.
+  type: str
+  returned: always
+token_type:
+  description: Token type (e.g. Bearer).
+  type: str
+  returned: always
+expires_in:
+  description: Expiry time in seconds.
+  type: int
+  returned: always
+response:
+  description: Full raw JSON response from Azure AD.
+  type: dict
+  returned: always
+'''
+
+def run_module():
+    # Define input arguments that the module accepts
+    module_args = dict(
+        client_id=dict(type='str', required=True),              # Azure client ID (application ID)
+        client_secret=dict(type='str', required=True, no_log=True),  # Client secret (hidden in logs)
+        tenant_id=dict(type='str', required=True),              # Azure AD tenant ID
+        scope=dict(type='str', required=True),                  # Scope (typically API resource + .default)
+        grant_type=dict(type='str', default='client_credentials')  # Grant type for OAuth2 (default: client_credentials)
+    )
+
+    # Initialize the result dictionary returned to Ansible
+    result = dict(changed=False, access_token="", response={})
+
+    # Create the Ansible module object with defined arguments
+    module = AnsibleModule(argument_spec=module_args, supports_check_mode=True)
+
+    # Construct the token URL based on the tenant ID
+    url = f"https://login.microsoftonline.com/{module.params['tenant_id']}/oauth2/v2.0/token"
+
+    # Set the request headers (content type for form encoding)
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+
+    # Prepare the body payload for the token request
+    payload = {
+        'grant_type': module.params['grant_type'],
+        'client_id': module.params['client_id'],
+        'client_secret': module.params['client_secret'],
+        'scope': module.params['scope']
+    }
+
+    try:
+        # Make the POST request to Azure AD token endpoint
+        response = requests.post(url, data=payload, headers=headers)
+        response.raise_for_status()  # Raise error for any HTTP error codes
+
+        # Parse the response and extract the access token
+        token_data = response.json()
+        result['access_token'] = token_data.get('access_token', '')  # Extract token
+        result['response'] = token_data                             # Save full token response for debugging
+    except requests.exceptions.RequestException as e:
+        # On failure, exit with error message
+        module.fail_json(msg=str(e), **result)
+
+    # Exit the module with the final result
+    module.exit_json(**result)
+
+# Main entry point that calls the module logic
+def main():
+    run_module()
+
+# Execute the script if it's run as main
+if __name__ == '__main__':
+    main()
