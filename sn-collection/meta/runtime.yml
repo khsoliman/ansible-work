@@ -1,0 +1,26 @@
+---
+# Minimum Ansible version required to use this collection
+requires_ansible: ">=2.15.0"
+
+# Routing map for plugins (like modules), so Ansible can locate them correctly
+plugin_routing:
+  module:
+    # Short name 'get_azure_token' maps to fully-qualified name below
+    get_azure_token:
+      redirect: riotinto.servicenow.get_azure_token  # Points to actual location in your collection
+
+    # Short name 'get_cmdb_records' maps to the full path as well
+    get_cmdb_records:
+      redirect: riotinto.servicenow.get_cmdb_records  # Helps avoid namespace issues in playbooks
+
+    # Short name 'get_cmdb_records' maps to the full path as well
+    standard_change:
+      redirect: riotinto.servicenow.standard_change  # Helps avoid namespace issues in playbooks
+
+# Optional grouping of modules under a logical name
+# Useful for organization, UI filters, or documentation tools
+action_groups:
+  service_now_cmdb:  # Logical group name
+    - get_azure_token     # Token generation module
+    - get_cmdb_records    # CMDB query module
+    - standard_change     # Create a standard change
