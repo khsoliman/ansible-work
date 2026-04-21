@@ -1,1 +1,144 @@
 
+#!/usr/bin/python
+
+from ansible.module_utils.basic import AnsibleModule
+import requests
+import urllib.parse
+
+DOCUMENTATION = r'''
+---
+module: get_cmdb_records
+short_description: Query ServiceNow CMDB tables via API Gateway
+description:
+  - This module queries ServiceNow CMDB tables using REST API via Azure API Gateway.
+version_added: "1.1.0"
+options:
+  instance_url:
+    required: true
+    type: str
+  auth_token:
+    required: true
+    type: str
+  subscription_key:
+    required: true
+    type: str
+  table:
+    required: true
+    type: str
+  sysparm_query:
+    required: false
+    type: str
+    default: ''
+  sysparm_fields:
+    required: false
+    type: str
+    default: ''
+  sysparm_display_value:
+    required: false
+    type: str
+    choices: ['true','false','all']
+    default: 'false'
+  sysparm_count:
+    required: false
+    type: bool
+    default: False
+'''
+
+def run_module():
+
+    module_args = dict(
+        instance_url=dict(type='str', required=True),
+        auth_token=dict(type='str', no_log=True, required=True),
+        subscription_key=dict(type='str', no_log=True, required=True),
+        table=dict(type='str', required=True),
+        sysparm_query=dict(type='str', default=''),
+        sysparm_fields=dict(type='str', default=''),
+        sysparm_display_value=dict(type='str', default='false'),
+        sysparm_count=dict(type='bool', default=False)
+    )
+
+    module = AnsibleModule(argument_spec=module_args, supports_check_mode=True)
+    result = dict(changed=False)
+
+    base_url = f"{module.params['instance_url'].rstrip('/')}/{module.params['table']}"
+
+    headers = {
+        "Authorization": f"Bearer {module.params['auth_token']}",
+        "Ocp-Apim-Subscription-Key": module.params["subscription_key"],
+        "Content-Type": "application/json"
+    }
+
+    # ------------------------------------------------
+    # If ONLY count is required → do lightweight count
+    # ------------------------------------------------
+    if module.params["sysparm_count"]:
+        url = f"{base_url}?sysparm_query={urllib.parse.quote(module.params['sysparm_query'])}&sysparm_limit=1"
+        try:
+            resp = requests.get(url, headers=headers, verify=False).json()
+
+            # Some APIM proxies return count in stats
+            if "result" in resp and "stats" in resp["result"]:
+                result["count"] = int(resp["result"]["stats"].get("count", 0))
+            else:
+                # fallback: manually count using pagination
+                pass
+
+        except:
+            pass  # fallback to pagination below
+
+    # ------------------------------------------------
+    # FULL PAGINATION LOGIC (always reliable)
+    # ------------------------------------------------
+    limit = 2000                # safe limit to avoid timeout
+    offset = 0
+    all_records = []
+    total_count = 0
+
+    while True:
+
+        params = {
+            "sysparm_limit": limit,
+            "sysparm_offset": offset,
+            "sysparm_display_value": module.params["sysparm_display_value"]
+        }
+
+        if module.params["sysparm_query"]:
+            params["sysparm_query"] = module.params["sysparm_query"]
+
+        if module.params["sysparm_fields"]:
+            params["sysparm_fields"] = module.params["sysparm_fields"]
+
+        full_url = f"{base_url}?{urllib.parse.urlencode(params)}"
+
+        try:
+            response = requests.get(full_url, headers=headers, verify=False)
+            response.raise_for_status()
+            data = response.json().get("result", [])
+
+            if not data:
+                break
+
+            all_records.extend(data)
+            total_count += len(data)
+
+            # If fewer than limit returned → no more pages
+            if len(data) < limit:
+                break
+
+            offset += limit
+
+        except Exception as e:
+            module.fail_json(msg=f"Error calling ServiceNow API: {str(e)}", **result)
+
+    result["count"] = total_count
+    result["records"] = all_records
+
+    module.exit_json(**result)
+
+
+def main():
+    run_module()
+
+
+if __name__ == "__main__":
+    main()
