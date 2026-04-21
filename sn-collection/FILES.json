@@ -1,0 +1,152 @@
+{
+ "files": [
+  {
+   "name": ".",
+   "ftype": "dir",
+   "chksum_type": null,
+   "chksum_sha256": null,
+   "format": 1
+  },
+  {
+   "name": "license",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "8168cbc87ed9e9efd4f4e84b7de247aaec95fa028d284ebf66848c578d17b7d0",
+   "format": 1
+  },
+  {
+   "name": "docs",
+   "ftype": "dir",
+   "chksum_type": null,
+   "chksum_sha256": null,
+   "format": 1
+  },
+  {
+   "name": "docs/standard_change_module.rst",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "4332e314ea94121ced6de73355022b87ad833ad4034f5a864dd16506cc1f729e",
+   "format": 1
+  },
+  {
+   "name": "docs/get_azure_token_module.rst",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "fd037f38406d10c72d04505497923c6f68ca44a80cfcedde37736a5ecbe1ee97",
+   "format": 1
+  },
+  {
+   "name": "docs/examples",
+   "ftype": "dir",
+   "chksum_type": null,
+   "chksum_sha256": null,
+   "format": 1
+  },
+  {
+   "name": "docs/examples/get_cmdb_records.yml",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "22cf307a9441a6338c5ded374d92b5b31d91b05746ace6e631298de138687b62",
+   "format": 1
+  },
+  {
+   "name": "docs/examples/standard_change_tasks_only.yml",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "d32979e53aa9ae14e9f1906a9b7a039ad1e3756d7ea23782b52a44ad674f026e",
+   "format": 1
+  },
+  {
+   "name": "docs/examples/standard_change.yml",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "704e8988862d23cb735553ee81534b7b92f0ebcfb688565c8a2974046b164567",
+   "format": 1
+  },
+  {
+   "name": "docs/examples/get_azure_token.yml",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "e8cde4e075d19e8594ddc7a65051cd44093fccf833698434b10a492698fea48d",
+   "format": 1
+  },
+  {
+   "name": "docs/get_cmdb_records_module.rst",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "bef9644aa71e1f2c0b4e96807328d9fe152d7293450bf2afc53865fed7dee96c",
+   "format": 1
+  },
+  {
+   "name": "CHANGELOG.md",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "042d486994b4fb9cdf7236540c0e03693f91fc1db7b77998a13e045457422cac",
+   "format": 1
+  },
+  {
+   "name": "README.md",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "22a5e3ded358c1e8d875926d4b3876de10bc923da2da7dc33f51cc3f74603393",
+   "format": 1
+  },
+  {
+   "name": "meta",
+   "ftype": "dir",
+   "chksum_type": null,
+   "chksum_sha256": null,
+   "format": 1
+  },
+  {
+   "name": "meta/runtime.yml",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "b1834ed4f60e6873cfe4f08e527746c17e949993320e60de3430134d87b531ca",
+   "format": 1
+  },
+  {
+   "name": "plugins",
+   "ftype": "dir",
+   "chksum_type": null,
+   "chksum_sha256": null,
+   "format": 1
+  },
+  {
+   "name": "plugins/modules",
+   "ftype": "dir",
+   "chksum_type": null,
+   "chksum_sha256": null,
+   "format": 1
+  },
+  {
+   "name": "plugins/modules/get_cmdb_records.py",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "415a3d1520481235c1929c991babda7842256b3457f71882b28ed30562a2401c",
+   "format": 1
+  },
+  {
+   "name": "plugins/modules/get_azure_token.py",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "c607ea77d3225a0a60f264e17da1e136ffad0788537fb783b34f64ec30df00fb",
+   "format": 1
+  },
+  {
+   "name": "plugins/modules/standard_change.py",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "20eba6eee468f28a1b3e9e8dc51b984b2d543383bac7da6bef9fa8c57f10ee12",
+   "format": 1
+  },
+  {
+   "name": "plugins/README.md",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "d5b08a1feb274413112c41fe3fc1075650ce6285b8374356f568dbd2067f7df4",
+   "format": 1
+  }
+ ],
+ "format": 1
+}
