@@ -1,0 +1,108 @@
+---
+- name: Create and manage ServiceNow Standard Change
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    baseUrl: "https://apim-icc-syd-npe.riotinto.org/test/servicenow/change/management/v1"
+    apim_key: "{{ lookup('env', 'APIM_SUBSCRIPTION_KEY') }}"
+
+    change_start: "2026-02-01 10:00:00"
+    change_end: "2026-02-01 12:00:00"
+
+  tasks:
+
+    # -------------------------------------------------
+    # 1. Get Azure AD access token
+    # -------------------------------------------------
+    - name: Get Azure AD access token
+      riotinto.servicenow.get_azure_token:
+        tenant_id: "{{ az_tenant_id }}"
+        client_id: "{{ az_client_id }}"
+        client_secret: "{{ az_client_secret }}"
+        scope: "{{ az_scope }}"
+      register: auth_token
+
+    # -------------------------------------------------
+    # 2. Create Standard Change
+    # -------------------------------------------------
+    - name: Create Standard Change
+      riotinto.servicenow.standard_change:
+        instance_url: "{{ baseUrl }}"
+        auth_token: "{{ auth_token.access_token }}"
+        subscription_key: "{{ apim_key }}"
+        validate_certs: false
+
+        action: create_change
+        short_description: "Monthly patching - Linux servers"
+        start_date: "{{ change_start }}"
+        end_date: "{{ change_end }}"
+      register: change
+
+    # -------------------------------------------------
+    # 3. Create Implementation Task
+    # -------------------------------------------------
+    - name: Create Implementation task
+      riotinto.servicenow.standard_change:
+        instance_url: "{{ baseUrl }}"
+        auth_token: "{{ auth_token.access_token }}"
+        subscription_key: "{{ apim_key }}"
+        validate_certs: false
+
+        action: create_task
+        change_sys_id: "{{ change.result.sys_id }}"
+        short_description: "Implement change"
+        planned_start_date: "{{ change_start }}"
+        planned_end_date: "{{ change_end }}"
+        assigned_to: "Punam.Gupta"
+
+    # -------------------------------------------------
+    # 4. List all Change Tasks
+    # -------------------------------------------------
+    - name: List change tasks
+      riotinto.servicenow.standard_change:
+        instance_url: "{{ baseUrl }}"
+        auth_token: "{{ auth_token.access_token }}"
+        subscription_key: "{{ apim_key }}"
+        validate_certs: false
+
+        action: list_tasks
+        change_sys_id: "{{ change.result.sys_id }}"
+      register: change_tasks
+
+    # -------------------------------------------------
+    # 5. Move tasks to Work in Progress
+    # -------------------------------------------------
+    - name: Move tasks to Work in Progress
+      riotinto.servicenow.standard_change:
+        instance_url: "{{ baseUrl }}"
+        auth_token: "{{ auth_token.access_token }}"
+        subscription_key: "{{ apim_key }}"
+        validate_certs: false
+
+        action: update_task
+        change_sys_id: "{{ change.result.sys_id }}"
+        task_sys_id: "{{ item.sys_id.value }}"
+        state: 2
+        work_notes: "Task moved to Work in Progress by Ansible"
+      loop: "{{ change_tasks.result.result }}"
+      when: item.state.value | int == 1
+
+    # -------------------------------------------------
+    # 6. Close completed tasks
+    # -------------------------------------------------
+    - name: Close change tasks
+      riotinto.servicenow.standard_change:
+        instance_url: "{{ baseUrl }}"
+        auth_token: "{{ auth_token.access_token }}"
+        subscription_key: "{{ apim_key }}"
+        validate_certs: false
+
+        action: update_task
+        change_sys_id: "{{ change.result.sys_id }}"
+        task_sys_id: "{{ item.sys_id.value }}"
+        state: 3
+        close_code: "Successful"
+        work_notes: "Task closed automatically by Ansible"
+      loop: "{{ change_tasks.result.result }}"
+      when: item.state.value | int == 2

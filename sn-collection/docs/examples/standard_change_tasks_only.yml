@@ -1,0 +1,46 @@
+---
+- name: Manage tasks for an existing Standard Change
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    baseUrl: "https://apim-icc-syd-npe.riotinto.org/test/servicenow/change/management/v1"
+    apim_key: "{{ lookup('env', 'APIM_SUBSCRIPTION_KEY') }}"
+    change_sys_id: "5c8412e887f27a50346eedf83cbb3539"
+
+  tasks:
+
+    - name: Get Azure AD access token
+      riotinto.servicenow.get_azure_token:
+        tenant_id: "{{ az_tenant_id }}"
+        client_id: "{{ az_client_id }}"
+        client_secret: "{{ az_client_secret }}"
+        scope: "{{ az_scope }}"
+      register: auth_token
+
+    - name: List change tasks
+      riotinto.servicenow.standard_change:
+        instance_url: "{{ baseUrl }}"
+        auth_token: "{{ auth_token.access_token }}"
+        subscription_key: "{{ apim_key }}"
+        validate_certs: false
+
+        action: list_tasks
+        change_sys_id: "{{ change_sys_id }}"
+      register: change_tasks
+
+    - name: Close all open tasks
+      riotinto.servicenow.standard_change:
+        instance_url: "{{ baseUrl }}"
+        auth_token: "{{ auth_token.access_token }}"
+        subscription_key: "{{ apim_key }}"
+        validate_certs: false
+
+        action: update_task
+        change_sys_id: "{{ change_sys_id }}"
+        task_sys_id: "{{ item.sys_id.value }}"
+        state: 3
+        close_code: "Successful"
+        work_notes: "Closed automatically by Ansible"
+      loop: "{{ change_tasks.result.result }}"
+      when: item.state.value | int in [1, 2]

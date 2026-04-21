@@ -1,0 +1,16 @@
+---
+- name: Generate Azure AD token
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Get Azure token
+      riotinto.servicenow.get_azure_token:
+        tenant_id: "{{ tenant-id }}"
+        client_id: "{{ client-id }}"
+        client_secret: "{{ client-secret }}"
+        scope: "{{ scope }}"
+      register: token_result
+
+    - name: Show token
+      ansible.builtin.debug:
+        var: token_result.access_token 

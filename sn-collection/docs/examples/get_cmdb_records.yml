@@ -1,0 +1,20 @@
+---
+- name: Query ServiceNow CMDB
+  hosts: localhost
+  gather_facts: no
+  vars:
+    subscription_key: "{{ subscription_key }}"
+  tasks:
+    - name: Get CMDB Relationship Info
+      riotinto.servicenow.get_cmdb_records:
+        instance_url: "{{ instance_url }}"
+        auth_token: "{{ token_result.access_token }}"
+        subscription_key: "{{ subscription_key }}"
+        table: "cmdb_rel_ci"
+        sysparm_query: "type.nameSTARTSWITHprovisioned^child.sys_class_name=cmdb_ci_os_template"
+        sysparm_fields: "parent.name,child.name,type.name"
+      register: cmdb_output
+
+    - name: Display CMDB Results
+      ansible.builtin.debug:
+        var: cmdb_output.response
