@@ -1,1 +1,447 @@
 
+#!/usr/bin/python
+
+from ansible.module_utils.basic import AnsibleModule
+import requests
+import urllib3
+import os
+
+DOCUMENTATION = r'''
+---
+module: standard_change
+short_description: Manage ServiceNow Standard Change Requests and Tasks via API Gateway
+version_added: "2.0.0"
+'''
+
+RETURN = r'''
+result:
+  description: API response
+  returned: always
+changed:
+  type: bool
+  returned: always
+'''
+
+
+def build_optional_payload(module):
+    payload = {}
+    for key in [
+        "short_description",
+        "cmdb_ci",
+        "assigned_to",
+        "justification",
+        "risk_impact_analysis",
+        "change_plan",
+        "start_date",
+        "end_date",
+        "work_notes"
+    ]:
+        value = module.params.get(key)
+        if value:
+            payload[key] = value
+    return payload
+
+
+def safe_json(resp):
+    try:
+        return resp.json()
+    except ValueError:
+        return {}
+
+
+def run_module():
+
+    module_args = dict(
+        instance_url=dict(type='str', required=True),
+        auth_token=dict(type='str', required=True, no_log=True),
+        subscription_key=dict(type='str', required=True, no_log=True),
+        action=dict(type='str', required=True, choices=[
+            'create_change',
+            'get_change',
+            'update_change',
+            'list_tasks',
+            'get_task',
+            'create_task',
+            'update_task',
+            'get_template_id',
+            'upload_attachment'
+        ]),
+
+        sys_id=dict(type='str'),
+        standard_change_template_id=dict(type='str'),
+        template_name=dict(type='str'),
+        change_sys_id=dict(type='str'),
+        task_sys_id=dict(type='str'),
+
+        short_description=dict(type='str'),
+        cmdb_ci=dict(type='str'),
+        assigned_to=dict(type='str'),
+        planned_start_date=dict(type='str'),
+        planned_end_date=dict(type='str'),
+
+        justification=dict(type='str'),
+        risk_impact_analysis=dict(type='str'),
+        change_plan=dict(type='str'),
+        start_date=dict(type='str'),
+        end_date=dict(type='str'),
+
+        state=dict(type='int'),
+        close_code=dict(type='str'),
+        close_notes=dict(type='str'),
+        work_notes=dict(type='str'),
+
+        file_name=dict(type='str'),
+        table_name=dict(type='str'),
+        table_sys_id=dict(type='str'),
+
+        validate_certs=dict(type='bool', default=True),
+        body=dict(type='dict', default={})
+    )
+
+    module = AnsibleModule(argument_spec=module_args, supports_check_mode=True)
+    result = dict(changed=False)
+
+    validate_certs = module.params['validate_certs']
+    if not validate_certs:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    headers = {
+        "Authorization": f"Bearer {module.params['auth_token']}",
+        "Ocp-Apim-Subscription-Key": module.params['subscription_key'],
+        "Content-Type": "application/json"
+    }
+
+    base_url = module.params['instance_url'].rstrip("/")
+    action = module.params['action']
+
+    try:
+
+        # -------------------------
+        # CREATE CHANGE
+        # -------------------------
+        if action == "create_change":
+            if not module.params['standard_change_template_id']:
+                module.fail_json(msg="standard_change_template_id is required")
+
+            payload = build_optional_payload(module)
+            payload.update(module.params['body'])
+
+            url = f"{base_url}/api/sn_chg_rest/change/standard/{module.params['standard_change_template_id']}"
+
+            resp = requests.post(url, headers=headers, json=payload, verify=validate_certs)
+            if not resp.ok:
+                module.fail_json(msg="ServiceNow API error", response=safe_json(resp))
+
+            result["changed"] = True
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+
+        # -------------------------
+        # GET CHANGE
+        # -------------------------
+        if action == "get_change":
+            if not module.params['sys_id']:
+                module.fail_json(msg="sys_id is required")
+
+            url = f"{base_url}/api/sn_chg_rest/change/standard/{module.params['sys_id']}"
+            resp = requests.get(url, headers=headers, verify=validate_certs)
+
+            if not resp.ok:
+                module.fail_json(msg="ServiceNow API error", response=safe_json(resp))
+
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+
+        # -------------------------
+        # UPDATE / CLOSE CHANGE
+        # -------------------------
+        if action == "update_change":
+            if not module.params['sys_id']:
+                module.fail_json(msg="sys_id is required")
+
+            params = {}
+            payload = {}
+
+            # STATES THAT MUST GO IN QUERY STRING
+            if module.params.get("state") is not None:
+                if module.params["state"] in [0, 3]:
+                    params["state"] = module.params["state"]
+                else:
+                    payload["state"] = module.params["state"]
+
+            # Mandatory close_notes rule
+            if module.params.get("close_code") in ["unsuccessful", "successful_issues"]:
+                if not module.params.get("close_notes"):
+                    module.fail_json(
+                        msg="close_notes is mandatory when close_code is unsuccessful or successful_issues"
+                    )
+
+            if module.params.get("close_code"):
+                params["close_code"] = module.params["close_code"]
+
+            if module.params.get("close_notes"):
+                payload["close_notes"] = module.params["close_notes"]
+
+            if module.params.get("work_notes"):
+                payload["work_notes"] = module.params["work_notes"]
+
+             # Dates → QUERY PARAMS (critical)
+            if module.params.get("start_date"):
+                params["start_date"] = module.params["start_date"]
+
+            if module.params.get("end_date"):
+                params["end_date"] = module.params["end_date"]
+
+            # Body fields
+            if module.params.get("short_description"):
+                payload["short_description"] = module.params["short_description"]
+
+            url = f"{base_url}/api/sn_chg_rest/change/standard/{module.params['sys_id']}"
+
+            resp = requests.patch(
+                url,
+                headers=headers,
+                params=params,   # ✅ IMPORTANT
+                json=payload,
+                verify=validate_certs
+            )
+
+            if not resp.ok:
+                module.fail_json(
+                    msg="ServiceNow API error",
+                    status_code=resp.status_code,
+                    response=safe_json(resp)
+                )
+
+            result["changed"] = True
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+
+
+        # -------------------------
+        # LIST TASKS
+        # -------------------------
+        if action == "list_tasks":
+            if not module.params['change_sys_id']:
+                module.fail_json(msg="change_sys_id is required")
+
+            url = f"{base_url}/api/sn_chg_rest/change/{module.params['change_sys_id']}/task"
+            resp = requests.get(url, headers=headers, verify=validate_certs)
+
+            if not resp.ok:
+                module.fail_json(msg="ServiceNow API error", response=safe_json(resp))
+
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+
+        # -------------------------
+        # GET TASK
+        # -------------------------
+        if action == "get_task":
+            if not module.params['change_sys_id'] or not module.params['task_sys_id']:
+                module.fail_json(msg="change_sys_id and task_sys_id are required")
+
+            url = f"{base_url}/api/sn_chg_rest/change/{module.params['change_sys_id']}/task/{module.params['task_sys_id']}"
+            resp = requests.get(url, headers=headers, verify=validate_certs)
+
+            if not resp.ok:
+                module.fail_json(msg="ServiceNow API error", response=safe_json(resp))
+
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+
+        # -------------------------
+        # CREATE TASK
+        # -------------------------
+        if action == "create_task":
+            if not module.params['change_sys_id']:
+                module.fail_json(msg="change_sys_id is required")
+
+            payload = build_optional_payload(module)
+            payload.update(module.params["body"])
+
+            url = f"{base_url}/api/sn_chg_rest/change/{module.params['change_sys_id']}/task"
+
+            resp = requests.post(url, headers=headers, json=payload, verify=validate_certs)
+
+            if not resp.ok:
+                module.fail_json(msg="ServiceNow API error", response=safe_json(resp))
+
+            result["changed"] = True
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+
+        # -------------------------
+        # UPDATE / CLOSE TASK
+        # -------------------------
+        if action == "update_task":
+            if not module.params['change_sys_id'] or not module.params['task_sys_id']:
+                module.fail_json(msg="change_sys_id and task_sys_id are required")
+
+            params = {}
+            if module.params.get("planned_start_date"):
+                params["planned_start_date"] = module.params["planned_start_date"]
+            if module.params.get("planned_end_date"):
+                params["planned_end_date"] = module.params["planned_end_date"]
+            if module.params.get("assigned_to"):
+                params["assigned_to"] = module.params["assigned_to"]
+
+            payload = {}
+            if module.params.get("state") is not None:
+                payload["state"] = module.params["state"]
+            if module.params.get("work_notes"):
+                payload["work_notes"] = module.params["work_notes"]
+
+            url = f"{base_url}/api/sn_chg_rest/change/{module.params['change_sys_id']}/task/{module.params['task_sys_id']}"
+
+            resp = requests.patch(url, headers=headers, params=params, json=payload, verify=validate_certs)
+
+            if not resp.ok:
+                module.fail_json(msg="ServiceNow API error", response=safe_json(resp))
+
+            result["changed"] = True
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+
+
+        # -------------------------
+        # GET STANDARD CHANGE TEMPLATE ID BY NAME
+        # -------------------------
+        if action == "get_template_id":
+            if not module.params.get("template_name"):
+                module.fail_json(msg="template_name is required")
+
+            params = {
+                "name": module.params["template_name"]
+            }
+
+            url = f"{base_url}/api/sn_chg_rest/change/standard/template"
+
+            resp = requests.get(
+                url,
+                headers=headers,
+                params=params,
+                verify=validate_certs
+            )
+
+            if not resp.ok:
+                module.fail_json(
+                    msg="ServiceNow API error",
+                    status_code=resp.status_code,
+                    response=safe_json(resp)
+                )
+
+            result["changed"] = False
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+
+        # -------------------------
+        # UPLOAD ATTACHMENT (Enhanced)
+        # -------------------------
+        if action == "upload_attachment":
+
+            change_sys_id = module.params.get("change_sys_id")
+            file_name_param = module.params.get("file_name")  # may be a string or list
+            table_name = module.params.get("table_name", "change_request")
+
+            if not change_sys_id:
+                module.fail_json(msg="change_sys_id is required")
+
+            if not file_name_param:
+                module.fail_json(msg="file_name is required (single file or list of files)")
+
+            # Normalize to list
+            file_list = file_name_param if isinstance(file_name_param, list) else [file_name_param]
+
+            allowed_ext = [".txt", ".csv"]
+            files_payload = []
+            open_handles = []
+
+            # Validate files + build multipart list
+            
+            for file_path in file_list:
+
+                # Extract clean filename.ext
+                basename = os.path.basename(file_path).strip()
+
+                # Validate extension
+                if not any(basename.lower().endswith(ext) for ext in allowed_ext):
+                    module.fail_json(
+                        msg=f"Invalid file type for '{basename}'. Allowed types: {allowed_ext}"
+                    )
+
+                # Open the file
+                try:
+                    f = open(file_path, "rb")
+                    open_handles.append(f)
+                except Exception as e:
+                    module.fail_json(
+                        msg=f"Unable to open file '{file_path}'",
+                        error=str(e)
+                    )
+
+                # Assign MIME type
+                if basename.lower().endswith(".csv"):
+                    mime = "text/csv"
+                else:
+                    mime = "text/plain"
+
+                # Multipart tuple MUST use basename
+                files_payload.append(
+                    ("", (basename, f, mime))
+                )
+
+
+            # Build URL
+            first_basename = os.path.basename(file_list[0]).strip()
+
+            url = (
+                f"{base_url}/api/now/attachment/file?table_name={table_name}&table_sys_id={change_sys_id}&file_name={first_basename}"
+            )
+
+            # DO NOT set Content-Type; requests will generate correct boundary
+            headers = {
+                "Authorization": f"Bearer {module.params['auth_token']}",
+                "Ocp-Apim-Subscription-Key": module.params['subscription_key']
+            }
+
+            try:
+                resp = requests.post(
+                    url,
+                    headers=headers,
+                    files=files_payload,
+                    verify=validate_certs
+                )
+            finally:
+                # Ensure all file handles are closed
+                for h in open_handles:
+                    try:
+                        h.close()
+                    except:
+                        pass
+
+            if not resp.ok:
+                module.fail_json(
+                    msg="ServiceNow API error during file upload",
+                    status_code=resp.status_code,
+                    response=safe_json(resp)
+                )
+
+            result["changed"] = True
+            result["result"] = safe_json(resp)
+            module.exit_json(**result)
+        # -------------------------
+        # SAFETY NET
+        # -------------------------
+        module.fail_json(msg=f"Unsupported action: {action}")
+
+    except Exception as e:
+        module.fail_json(msg="Unhandled exception in standard_change module", error=str(e))
+
+
+def main():
+    run_module()
+
+
+if __name__ == "__main__":
+    main()
